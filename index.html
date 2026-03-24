@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบสร้างรายงาน WFH (Hybrid Workplace)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #f3f4f6;
+        }
+        /* Style สำหรับการพิมพ์ */
+        @media print {
+            @page {
+                size: A4 landscape; /* เปลี่ยนจาก portrait เป็น landscape */
+                margin: 10mm 15mm; /* ปรับขอบกระดาษ บน-ล่าง 1cm, ซ้าย-ขวา 1.5cm */
+            }
+            body {
+                background-color: #ffffff;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+                margin: 0;
+                padding: 0;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .print-area {
+                width: 100%;
+                margin: 0;
+                padding: 0;
+            }
+            .form-box {
+                box-shadow: none !important;
+                border: none !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                height: 185mm !important; /* ล็อคความสูงให้พอดี 1 หน้า A4 แนวนอน (210mm ลบขอบ) */
+                page-break-after: always;
+                break-after: page;
+                display: block !important;
+            }
+        }
+        
+        .form-box {
+            background-color: white;
+            padding: 2rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+            min-height: 185mm; /* ให้หน้าเว็บแสดงผลความสูงใกล้เคียง A4 แนวนอน ด้วย */
+            display: block;
+        }
+    </style>
+</head>
+<body class="text-gray-800 p-4 md:p-8">
+
+    <!-- ส่วนควบคุม (ซ่อนตอนพิมพ์) -->
+    <div class="max-w-4xl mx-auto bg-white p-6 rounded-lg shadow-md mb-8 no-print">
+        <h1 class="text-2xl font-bold text-center mb-6 text-blue-700">ระบบสร้างแบบฟอร์มรายงาน WFH (สอบ.กรร.สสล.)</h1>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- เลือกวันที่ -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">1. เลือกวันที่ปฏิบัติงาน (WFH)</label>
+                <input type="date" id="workDate" class="w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500" onchange="checkScheduledStaff()">
+                <p class="text-sm text-gray-500 mt-2">* ระบบจะเลือกพนักงานที่มีคิว WFH ในตาราง มี.ค.-เม.ย. 69 ให้อัตโนมัติ</p>
+            </div>
+
+            <!-- รายชื่อพนักงาน -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">2. เลือกบุคลากรที่ต้องการออกรายงาน</label>
+                <div id="staffList" class="border border-gray-300 rounded-md p-4 h-48 overflow-y-auto bg-gray-50">
+                    <!-- รายชื่อจะถูกสร้างด้วย JavaScript -->
+                </div>
+            </div>
+        </div>
+
+        <!-- เพิ่มช่องกรอกแผนงาน/ภารกิจงาน -->
+        <div class="mt-6">
+            <label class="block text-sm font-medium text-gray-700 mb-2">3. ระบุแผนงาน/ภารกิจงาน</label>
+            <textarea id="taskInput" rows="2" class="w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500" placeholder="ระบุรายละเอียดงาน เช่น ตามที่ผู้บังคับบัญชามอบหมาย, ออกแบบ ประมาณการ จัดทำเอกสาร..."></textarea>
+            <p class="text-sm text-gray-500 mt-2">* ข้อความนี้จะไปปรากฏในช่อง "แผนงาน/ภารกิจงาน" ของแบบฟอร์ม</p>
+        </div>
+
+        <div class="mt-6 flex justify-center gap-4 border-t pt-6">
+            <button onclick="generateReports()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-md shadow transition duration-200 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                สร้างรายงาน
+            </button>
+            <button onclick="window.print()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-md shadow transition duration-200 flex items-center hidden" id="printBtn">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
+                พิมพ์รายงาน (Print)
+            </button>
+        </div>
+    </div>
+
+    <!-- พื้นที่แสดงรายงาน (Print Area) -->
+    <div id="reportContainer" class="max-w-4xl mx-auto print-area">
+        <!-- ฟอร์มรายงานจะมาแสดงที่นี่ -->
+    </div>
+
+    <script>
+        // ข้อมูลบุคลากรและวันที่ WFH ตามไฟล์ Excel ที่ส่งมา (ตาราง มี.ค. และ เม.ย. 2569)
+        // หมายเหตุ: 2569 คือปี ค.ศ. 2026
+        const staffData = [
+            { 
+                id: "s1", name: "น.ส.ณัฏฐา คณาฤทธิ์", position: "วิศวกร 5",
+                wfhDates: ["2026-03-31", "2026-04-02", "2026-04-07", "2026-04-17", "2026-04-21", "2026-04-28"]
+            },
+            { 
+                id: "s2", name: "น.ส.เนตรนภิส สีดำ", position: "วิศวกร 5",
+                wfhDates: ["2026-04-01", "2026-04-08", "2026-04-16", "2026-04-22", "2026-04-29"]
+            },
+            { 
+                id: "s3", name: "น.ส.ชลทิชา จันทร์อ่อน", position: "นักบริหารงาน 5",
+                wfhDates: ["2026-03-30", "2026-04-03", "2026-04-22", "2026-04-28"]
+            },
+            { 
+                id: "s4", name: "น.ส.พักตร์ชนก จันทนกูล", position: "ช่าง 4",
+                wfhDates: ["2026-03-31", "2026-04-01", "2026-04-07", "2026-04-20", "2026-04-21", "2026-04-29"]
+            },
+            { 
+                id: "s5", name: "นายเรวัตร แยกโคกสูง", position: "ช่าง 5",
+                wfhDates: ["2026-04-02", "2026-04-09", "2026-04-17", "2026-04-20", "2026-04-30"]
+            },
+            { 
+                id: "s6", name: "นายสวัสดิ์ เฮงสงเคราะห์", position: "ช่าง 4",
+                wfhDates: ["2026-03-30", "2026-04-10", "2026-04-21", "2026-04-27"]
+            },
+            { 
+                id: "s7", name: "นายวิโรจน์ ศรีอินทร์", position: "ช่าง 4",
+                wfhDates: ["2026-03-31", "2026-04-07", "2026-04-22", "2026-04-28"]
+            },
+            { 
+                id: "s8", name: "นายภาณุวัฒน์ พันธ์ศรี", position: "ลูกจ้าง",
+                wfhDates: ["2026-04-01", "2026-04-08", "2026-04-16", "2026-04-23", "2026-04-29"]
+            }
+        ];
+
+        const thaiMonthsFull = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
+        const thaiMonthsShort = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+
+        // โหลดรายชื่อตอนเริ่มต้น
+        window.onload = () => {
+            const listContainer = document.getElementById('staffList');
+            staffData.forEach(staff => {
+                const div = document.createElement('div');
+                div.className = "flex items-center mb-2";
+                div.innerHTML = `
+                    <input type="checkbox" id="${staff.id}" value="${staff.id}" class="staff-checkbox w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 cursor-pointer">
+                    <label for="${staff.id}" class="ml-2 text-sm font-medium text-gray-900 cursor-pointer">${staff.name} <span class="text-xs text-gray-500">(${staff.position})</span></label>
+                `;
+                listContainer.appendChild(div);
+            });
+        };
+
+        // เช็คว่าวันเว็บที่เลือก ใครมีคิวบ้าง แล้วติ๊กถูกให้อัตโนมัติ
+        function checkScheduledStaff() {
+            const selectedDate = document.getElementById('workDate').value;
+            if (!selectedDate) return;
+
+            document.querySelectorAll('.staff-checkbox').forEach(cb => {
+                const staff = staffData.find(s => s.id === cb.value);
+                // เช็คว่าใน array wfhDates มีวันที่เลือกหรือไม่
+                if (staff.wfhDates.includes(selectedDate)) {
+                    cb.checked = true;
+                } else {
+                    cb.checked = false;
+                }
+            });
+        }
+
+        // แปลงวันที่ YYYY-MM-DD เป็นภาษาไทย
+        function formatThaiDate(dateString) {
+            const d = new Date(dateString);
+            const day = d.getDate();
+            const monthIdx = d.getMonth();
+            const yearTh = d.getFullYear() + 543;
+            
+            return {
+                full: `${day} ${thaiMonthsFull[monthIdx]} ${yearTh}`, // เช่น 17 เมษายน 2569
+                short: `${day} ${thaiMonthsShort[monthIdx]} ${yearTh.toString().slice(-2)}`, // เช่น 17 เม.ย. 69
+                monthShort: thaiMonthsShort[monthIdx]
+            };
+        }
+
+        // ฟังก์ชันสร้างรายงาน
+        function generateReports() {
+            const dateInput = document.getElementById('workDate').value;
+            const taskInput = document.getElementById('taskInput').value;
+            const container = document.getElementById('reportContainer');
+            const printBtn = document.getElementById('printBtn');
+            
+            if (!dateInput) {
+                alert("กรุณาเลือกวันที่ก่อนครับ");
+                return;
+            }
+
+            // หาคนกที่ถูกเลือก
+            const selectedIds = Array.from(document.querySelectorAll('.staff-checkbox:checked')).map(cb => cb.value);
+            
+            if (selectedIds.length === 0) {
+                alert("กรุณาเลือกบุคลากรอย่างน้อย 1 ท่าน");
+                return;
+            }
+
+            const dates = formatThaiDate(dateInput);
+            container.innerHTML = ''; // เคลียร์ของเก่า
+            
+            // แปลงการขึ้นบรรทัดใหม่ให้เป็นแท็ก <br> สำหรับแสดงผลใน HTML
+            const formattedTask = taskInput.replace(/\n/g, '<br>');
+
+            selectedIds.forEach((id, index) => {
+                const staff = staffData.find(s => s.id === id);
+                
+                // สร้าง HTML สำหรับแต่ละคน (ปรับ Layout ใหม่ให้เหมือนภาพต้นฉบับเป๊ะๆ)
+                const reportHTML = `
+                    <div class="form-box text-[14px]">
+                        <div class="px-2 md:px-6">
+                            <!-- บรรทัดที่ 1: หัวข้อ และ ชื่อ -->
+                            <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-4">
+                                <div class="font-bold text-[14px]">แผนปฏิบัติงานแบบผสมผสานสถานที่ปฏิบัติงาน (Hybrid Workplace)</div>
+                                <div class="mt-2 md:mt-0 text-[14px] whitespace-nowrap">ชื่อ-สกุล..................<span class="font-medium">${staff.name}</span>.................</div>
+                            </div>
+                            
+                            <!-- บรรทัดที่ 2: วันที่ และ ตำแหน่ง -->
+                            <div class="flex flex-col md:flex-row justify-between mb-4 text-[14px]">
+                                <div class="mb-2 md:mb-0">รายสัปดาห์ วันที่.........<span class="font-medium">${dates.full}</span>....................................................</div>
+                                <div class="whitespace-nowrap">ตำแหน่ง/สังกัด........<span class="font-medium">${staff.position}</span> สอบ.กรร.สสล............</div>
+                            </div>
+                            
+                            <!-- บรรทัดที่ 3: เรียน -->
+                            <div class="mb-4 text-[14px]">
+                                เรียน หน.สอบ.กรร.สสล. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(ผู้บังคับบัญชาชั้นต้น)
+                            </div>
+                            
+                            <!-- ตารางแบบ 2 Header Rows ตามฟอร์ม -->
+                            <table class="w-full border-collapse border border-black mb-4 text-[14px]">
+                                <thead>
+                                    <tr>
+                                        <th class="border border-black py-2 px-1 w-12 text-center align-middle" rowspan="2">ที่</th>
+                                        <th class="border border-black py-2 px-4 text-center align-middle">แผนงาน/ภารกิจงาน</th>
+                                        <th class="border border-black py-2 px-2 w-32 text-center align-middle" rowspan="2">กำหนดแล้วเสร็จ</th>
+                                        <th class="border border-black py-2 px-2 text-center" colspan="2">รูปแบบการปฏิบัติงาน</th>
+                                    </tr>
+                                    <tr>
+                                        <th class="border border-black py-1 px-4 text-left font-bold bg-gray-50">${dates.monthShort}</th>
+                                        <th class="border border-black py-1 px-2 w-20 text-center">On-site</th>
+                                        <th class="border border-black py-1 px-2 w-20 text-center">WFH</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td class="border border-black py-3 px-1 text-center align-top">1</td>
+                                        <td class="border border-black py-3 px-4 text-left align-top">${formattedTask}</td>
+                                        <td class="border border-black py-3 px-2 text-center align-top">${dates.short}</td>
+                                        <td class="border border-black py-3 px-2 text-center align-top"></td>
+                                        <td class="border border-black py-3 px-2 text-center align-top">1</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="border border-black py-4 px-1"></td>
+                                        <td class="border border-black py-4 px-4"></td>
+                                        <td class="border border-black py-4 px-2"></td>
+                                        <td class="border border-black py-4 px-2"></td>
+                                        <td class="border border-black py-4 px-2"></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="border border-black py-4 px-1"></td>
+                                        <td class="border border-black py-4 px-4"></td>
+                                        <td class="border border-black py-4 px-2"></td>
+                                        <td class="border border-black py-4 px-2"></td>
+                                        <td class="border border-black py-4 px-2"></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="border border-black py-4 px-1"></td>
+                                        <td class="border border-black py-4 px-4"></td>
+                                        <td class="border border-black py-4 px-2"></td>
+                                        <td class="border border-black py-4 px-2"></td>
+                                        <td class="border border-black py-4 px-2"></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- จุดเซ็นชื่อจัดตามฟอร์ม (เพิ่มระยะห่างด้านบนประมาณ 2 บรรทัดด้วย mt-10) -->
+                        <div class="flex justify-end mt-10 pb-2 pr-4 md:pr-12">
+                            <div class="text-center">
+                                <div class="mb-2">(ลงชื่อ)....................................................ผู้ปฏิบัติงาน</div>
+                                <div>(&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${staff.name}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.innerHTML += reportHTML;
+            });
+
+            // แสดงปุ่มพิมพ์
+            printBtn.classList.remove('hidden');
+            
+            // เลื่อนจอลงมาให้เห็นรายงาน
+            container.scrollIntoView({ behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>
